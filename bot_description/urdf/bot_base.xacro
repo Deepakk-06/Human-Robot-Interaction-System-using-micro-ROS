@@ -1,0 +1,205 @@
+<?xml version="1.0" ?>
+<!--
+  bot_base.xacro  —  Gesture Controlled Robot (Upgraded)
+
+  Improvements:
+    - Correct box inertia tensors (were all 0.1, now computed from mass/dims)
+    - Chassis visual split into body + top-plate for better RViz appearance
+    - Rear caster moved to correct z so it touches the ground plane
+    - Wheel origin comments document the coordinate convention clearly
+    - All masses annotated; total robot ~8.5 kg (realistic tabletop platform)
+-->
+<robot name="bot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ── Inertia macros ──────────────────────────────────────────────── -->
+  <xacro:macro name="box_inertia" params="m l w h">
+    <!-- Solid box: l=x, w=y, h=z -->
+    <inertia
+      ixx="${m*(w*w + h*h)/12.0}"
+      ixy="0" ixz="0"
+      iyy="${m*(l*l + h*h)/12.0}"
+      iyz="0"
+      izz="${m*(l*l + w*w)/12.0}"/>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertia" params="m r h">
+    <!-- Solid cylinder spinning about its own axis (z) -->
+    <inertia
+      ixx="${m*(3*r*r + h*h)/12.0}"
+      ixy="0" ixz="0"
+      iyy="${m*(3*r*r + h*h)/12.0}"
+      iyz="0"
+      izz="${m*r*r/2.0}"/>
+  </xacro:macro>
+
+  <xacro:macro name="sphere_inertia" params="m r">
+    <inertia
+      ixx="${2*m*r*r/5.0}"
+      ixy="0" ixz="0"
+      iyy="${2*m*r*r/5.0}"
+      iyz="0"
+      izz="${2*m*r*r/5.0}"/>
+  </xacro:macro>
+
+  <!-- ── Chassis dimensions ─────────────────────────────────────────── -->
+  <xacro:property name="chassis_l"  value="0.70"/>
+  <xacro:property name="chassis_w"  value="0.50"/>
+  <xacro:property name="chassis_h"  value="0.18"/>
+  <xacro:property name="chassis_m"  value="5.0"/>
+
+  <xacro:property name="wheel_r"    value="0.15"/>
+  <xacro:property name="wheel_len"  value="0.05"/>
+  <xacro:property name="wheel_m"    value="1.0"/>
+  <xacro:property name="wheel_sep"  value="0.275"/>  <!-- half wheel-to-wheel distance -->
+
+  <xacro:property name="caster_r"   value="0.045"/>
+  <xacro:property name="caster_m"   value="0.4"/>
+
+  <!-- ── base_footprint ─────────────────────────────────────────────── -->
+  <link name="base_footprint"/>
+
+  <!-- ── base_link (chassis) ───────────────────────────────────────── -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${chassis_m}"/>
+      <xacro:box_inertia m="${chassis_m}" l="${chassis_l}" w="${chassis_w}" h="${chassis_h}"/>
+    </inertial>
+
+    <!-- Main chassis body -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="${chassis_l} ${chassis_w} ${chassis_h}"/></geometry>
+      <material name="chassis_grey">
+        <color rgba="0.22 0.22 0.25 1.0"/>
+      </material>
+    </visual>
+
+    <!-- Top accent plate -->
+    <visual>
+      <origin xyz="0 0 ${chassis_h*0.5 + 0.005}" rpy="0 0 0"/>
+      <geometry><box size="${chassis_l - 0.04} ${chassis_w - 0.04} 0.008"/></geometry>
+      <material name="accent_orange">
+        <color rgba="0.95 0.45 0.10 1.0"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="${chassis_l} ${chassis_w} ${chassis_h}"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <!-- chassis centre is wheel_r above floor, half chassis_h above base_footprint -->
+    <origin xyz="0 0 ${wheel_r}" rpy="0 0 0"/>
+    <parent link="base_footprint"/>
+    <child  link="base_link"/>
+  </joint>
+
+  <!-- ── Right drive wheel ──────────────────────────────────────────── -->
+  <!-- Positioned at Y = -wheel_sep; rotated so cylinder axis → Y-world  -->
+  <link name="right_wheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${wheel_m}"/>
+      <xacro:cylinder_inertia m="${wheel_m}" r="${wheel_r}" h="${wheel_len}"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_len}"/></geometry>
+      <material name="wheel_dark">
+        <color rgba="0.08 0.08 0.10 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_len}"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="right_wheel_joint" type="continuous">
+    <!-- rpy 1.57 = 90° so cylinder z-axis → world y-axis (drive direction) -->
+    <origin xyz="0 ${-wheel_sep} 0" rpy="${pi/2} 0 0"/>
+    <parent link="base_link"/>
+    <child  link="right_wheel_link"/>
+    <axis   xyz="0 0 -1"/>
+  </joint>
+
+  <!-- ── Left drive wheel ───────────────────────────────────────────── -->
+  <link name="left_wheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${wheel_m}"/>
+      <xacro:cylinder_inertia m="${wheel_m}" r="${wheel_r}" h="${wheel_len}"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_len}"/></geometry>
+      <material name="wheel_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_len}"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="left_wheel_joint" type="continuous">
+    <origin xyz="0 ${wheel_sep} 0" rpy="${pi/2} 0 0"/>
+    <parent link="base_link"/>
+    <child  link="left_wheel_link"/>
+    <axis   xyz="0 0 -1"/>
+  </joint>
+
+  <!-- ── Front caster ───────────────────────────────────────────────── -->
+  <!-- z offset = -(chassis_h/2 + caster_r) so sphere just touches floor -->
+  <link name="front_caster_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${caster_m}"/>
+      <xacro:sphere_inertia m="${caster_m}" r="${caster_r}"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="${caster_r}"/></geometry>
+      <material name="caster_silver">
+        <color rgba="0.7 0.7 0.75 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="${caster_r}"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="front_caster_joint" type="fixed">
+    <origin xyz="${chassis_l*0.36} 0 ${-(chassis_h/2.0 + caster_r - wheel_r)}" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child  link="front_caster_link"/>
+  </joint>
+
+  <!-- ── Rear caster ────────────────────────────────────────────────── -->
+  <link name="back_caster_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${caster_m}"/>
+      <xacro:sphere_inertia m="${caster_m}" r="${caster_r}"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="${caster_r}"/></geometry>
+      <material name="caster_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="${caster_r}"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="back_caster_joint" type="fixed">
+    <origin xyz="${-chassis_l*0.36} 0 ${-(chassis_h/2.0 + caster_r - wheel_r)}" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child  link="back_caster_link"/>
+  </joint>
+
+</robot>

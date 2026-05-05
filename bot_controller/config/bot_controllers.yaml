@@ -1,0 +1,75 @@
+# bot_controllers.yaml  —  Gesture Controlled Robot (Upgraded)
+#
+# Key improvements:
+#   - Separate velocity/acceleration limits for each axis
+#   - Odom published at 50 Hz (was default)
+#   - Wheel separation & radius match the upgraded URDF
+#   - cmd_vel timeout tightened to 0.3 s for faster safety response
+#   - open_loop_odom disabled so encoder odometry is used
+#   - Pose covariance diagonal populated for nav2 compatibility
+
+controller_manager:
+  ros__parameters:
+    update_rate: 100   # Hz
+
+    wheel_controller:
+      type: diff_drive_controller/DiffDriveController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+wheel_controller:
+  ros__parameters:
+    type: diff_drive_controller/DiffDriveController
+
+    use_stamped_vel: false
+
+    left_wheel_names:  ['left_wheel_joint']
+    right_wheel_names: ['right_wheel_joint']
+
+    # ── Geometry (must match bot_base.xacro) ──────────────────────────────
+    wheel_separation: 0.55      # m  (centre-to-centre)
+    wheel_radius:     0.15      # m
+
+    wheel_separation_multiplier: 1.0
+    left_wheel_radius_multiplier: 1.0
+    right_wheel_radius_multiplier: 1.0
+
+    # ── Publish ───────────────────────────────────────────────────────────
+    publish_rate:        50.0
+    odom_frame_id:       odom
+    base_frame_id:       base_footprint
+    pose_covariance_diagonal: [0.001, 0.001, 1e6, 1e6, 1e6, 0.01]
+    twist_covariance_diagonal: [0.001, 1e6,  1e6, 1e6, 1e6, 0.01]
+
+    open_loop:           false
+    enable_odom_tf:      true
+    publish_limited_velocity: true
+    publish_wheel_data:  true
+
+    # ── Safety timeout (shorter = safer) ──────────────────────────────────
+    cmd_vel_timeout: 0.3       # s  (was 0.5)
+
+    # ── Linear (forward/backward) limits ──────────────────────────────────
+    linear:
+      x:
+        has_velocity_limits:     true
+        max_velocity:            1.0     # m/s  (FAST mode cap)
+        min_velocity:           -1.0
+        has_acceleration_limits: true
+        max_acceleration:        2.0     # m/s²  (was 1.0)
+        min_acceleration:       -2.0
+        has_jerk_limits:         true
+        max_jerk:                5.0     # m/s³  (smooth start/stop)
+
+    # ── Angular (turning) limits ───────────────────────────────────────────
+    angular:
+      z:
+        has_velocity_limits:     true
+        max_velocity:            2.0     # rad/s
+        min_velocity:           -2.0
+        has_acceleration_limits: true
+        max_acceleration:        3.0     # rad/s²
+        min_acceleration:       -3.0
+        has_jerk_limits:         true
+        max_jerk:                6.0
